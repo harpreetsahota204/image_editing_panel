@@ -1,5 +1,7 @@
 # Image Edit Panel
 
+![img](image_edit_panel.gif)
+
 A [FiftyOne](https://docs.voxel51.com) plugin that brings chat-based image editing directly into the sample modal. Write a prompt, see the result inline, iterate, and save your favourite edits back to your dataset — all without leaving the app.
 
 ---
@@ -9,10 +11,15 @@ A [FiftyOne](https://docs.voxel51.com) plugin that brings chat-based image editi
 Open any sample in the FiftyOne modal and the **Image Edit** panel appears alongside it. From there you can:
 
 - **Prompt-driven edits** — describe the change you want in plain text and the panel calls a HuggingFace image-to-image model to apply it.
+
 - **Iterative refinement** — each edit becomes a new turn in the panel's history. You can branch off any previous turn to explore different directions from the same starting point.
+
 - **Advanced controls** — optionally supply a negative prompt, override inference steps, and set a guidance scale for models that support them.
+
 - **Save to dataset** — click the save icon on any edited turn to persist it as a new group slice (`edit_1`, `edit_2`, …) on your dataset. If the dataset is flat it is automatically converted to a grouped dataset on first save.
+
 - **Label copying** — when saving, optionally copy any label fields (detections, classifications, segmentations, etc.) from the source sample to the new edited slice.
+
 - **Session memory** — your edit history for each sample is preserved in the browser session, so switching between samples and coming back doesn't lose your work.
 
 ### Supported models
@@ -25,7 +32,10 @@ The panel ships with a curated list of warm HuggingFace image-to-image models an
 
 | Requirement | Detail |
 |-------------|--------|
-| FiftyOne | `>= 0.22` |
+| FiftyOne | Required |
+| HuggingFace Hub | Required |
+| Pillow | Required |
+| bson | Required |
 | HuggingFace API token | A `HF_TOKEN` with inference access — get one at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
 
 ---
