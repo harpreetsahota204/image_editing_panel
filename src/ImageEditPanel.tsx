@@ -281,6 +281,12 @@ const TrashIcon: React.FC = () => (
   </svg>
 );
 
+const SourceIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm0-12.5c-2.49 0-4.5 2.01-4.5 4.5S9.51 16.5 12 16.5s4.5-2.01 4.5-4.5S14.49 7.5 12 7.5zm0 7c-1.38 0-2.5-1.12-2.5-2.5S10.62 9.5 12 9.5s2.5 1.12 2.5 2.5S13.38 14.5 12 14.5z" />
+  </svg>
+);
+
 // ---------------------------------------------------------------------------
 // Spin keyframe — injected once on first render
 // ---------------------------------------------------------------------------
@@ -300,7 +306,7 @@ function ensureSpinKeyframe() {
 
 interface CachedSession {
   turns: Turn[];
-  editFromIdx: number;
+  sourceTurnIdx: number;
   selectedModel: string;
 }
 
@@ -370,7 +376,7 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
   // Turn history
   const [turns, setTurns] = useState<Turn[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>("");
-  const [editFromIdx, setEditFromIdx] = useState<number>(0);
+  const [sourceTurnIdx, setSourceTurnIdx] = useState<number>(0);
   const [prompt, setPrompt] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -485,9 +491,9 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
     const resetToFresh = () => {
       const t = freshTurn();
       setTurns([t]);
-      setEditFromIdx(0);
+      setSourceTurnIdx(0);
       setSelectedModel("");
-      saveSession(activeSampleId, { turns: [t], editFromIdx: 0, selectedModel: "" });
+      saveSession(activeSampleId, { turns: [t], sourceTurnIdx: 0, selectedModel: "" });
     };
 
     setPrompt("");
@@ -505,7 +511,7 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
     const existing = loadSessionValidated(activeSampleId, activeFilepath);
     if (existing) {
       setTurns(existing.turns);
-      setEditFromIdx(existing.editFromIdx);
+      setSourceTurnIdx(existing.sourceTurnIdx ?? 0);
       setSelectedModel(existing.selectedModel);
     } else {
       resetToFresh();
@@ -516,8 +522,15 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
   useEffect(() => {
     if (!activeSampleId || !activeFilepath || turns.length === 0) return;
     if (turns[0].filepath !== activeFilepath) return;
-    saveSession(activeSampleId, { turns, editFromIdx, selectedModel });
-  }, [turns, editFromIdx, selectedModel, activeSampleId, activeFilepath]);
+    saveSession(activeSampleId, { turns, sourceTurnIdx, selectedModel });
+  }, [turns, sourceTurnIdx, selectedModel, activeSampleId, activeFilepath]);
+
+  // ── sourceTurnIdx safety net — clamp to valid range after a deletion ────────
+  useEffect(() => {
+    if (turns.length && sourceTurnIdx >= turns.length) {
+      setSourceTurnIdx(turns.length - 1);
+    }
+  }, [turns]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Scroll to bottom on new turns ───────────────────────────────────────────
   useEffect(() => {
@@ -528,7 +541,7 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
   // ── Edit handler ────────────────────────────────────────────────────────────
   const handleEdit = useCallback(async () => {
     if (!prompt.trim() || isLoading || !activeFilepath) return;
-    const sourceFilepath = turns[editFromIdx]?.filepath ?? activeFilepath;
+    const sourceFilepath = turns[sourceTurnIdx]?.filepath ?? activeFilepath;
     setIsLoading(true);
     setErrorMsg(null);
     setWarnMsg(null);
@@ -572,7 +585,7 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
             guidance_scale: guidanceScale !== "" ? Number(guidanceScale) : null,
           },
         ];
-        setEditFromIdx(next.length - 1);
+        setSourceTurnIdx(next.length - 1);
         return next;
       });
       setPrompt("");
@@ -581,7 +594,7 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [prompt, isLoading, activeFilepath, turns, editFromIdx, selectedModel, negativePrompt, numSteps, guidanceScale, runEdit]);
+  }, [prompt, isLoading, activeFilepath, turns, sourceTurnIdx, selectedModel, negativePrompt, numSteps, guidanceScale, runEdit]);
 
   // ── Per-turn save ───────────────────────────────────────────────────────────
   const handleSaveTurn = useCallback((turnIdx: number) => {
@@ -642,7 +655,7 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
         setDeletingTurns((prev) => { const n = new Set(prev); n.delete(turnIdx); return n; });
         setTurns((prev) => {
           const next = prev.filter((_, i) => i !== turnIdx);
-          setEditFromIdx((idx) => (idx >= next.length ? next.length - 1 : idx));
+          setSourceTurnIdx((idx) => (idx >= next.length ? next.length - 1 : idx));
           return next;
         });
       })
@@ -735,21 +748,6 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
         >
           Browse models ↗
         </a>
-
-        {turns.length > 1 && (
-          <>
-            <label style={{ fontSize: 12, color: "#888", flexShrink: 0 }}>Edit from</label>
-            <select
-              style={{ ...S.select, flex: "0 1 120px", minWidth: 90 }}
-              value={editFromIdx}
-              onChange={(e) => setEditFromIdx(Number(e.target.value))}
-            >
-              {turns.map((_, i) => (
-                <option key={i} value={i}>{i === 0 ? "Original" : `Turn ${i}`}</option>
-              ))}
-            </select>
-          </>
-        )}
 
         <button
           style={S.advancedToggle}
@@ -866,7 +864,7 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
       {/* ── Scrollable turn history ── */}
       <div ref={scrollRef} style={S.scroll}>
         {turns.map((turn, i) => {
-          const isSource = i === editFromIdx;
+          const isSource = i === sourceTurnIdx;
           return (
             <div key={`${activeSampleId}-${i}`}>
               {i > 0 && (
@@ -889,27 +887,45 @@ const ImageEditPanel: React.FC<ImageEditPanelProps> = ({ data, schema }) => {
                   onLoad={isSource ? handleSourceImgLoad : undefined}
                 />
                 {i === 0 && <span style={S.badge}>Original</span>}
-                {i > 0 && (
+                {(turns.length > 1 || i > 0) && (
                   <div style={S.imgActions}>
-                    <button
-                      style={S.imgActionBtn(deletingTurns.has(i) || isSaving || isLoading)}
-                      onClick={() => handleDeleteTurn(i)}
-                      disabled={deletingTurns.has(i) || isSaving || isLoading}
-                      title="Delete this edit"
-                    >
-                      <TrashIcon />
-                    </button>
-                    <button
-                      style={S.imgActionBtn(savingTurns.has(i) || savedTurns.has(i) || isSaving)}
-                      onClick={() => handleSaveTurn(i)}
-                      disabled={savingTurns.has(i) || savedTurns.has(i) || isSaving}
-                      title={savedTurns.has(i) ? "Already saved as a group slice" : "Save as group slice"}
-                    >
-                      <SaveIcon />
-                      <span style={{ fontSize: 11 }}>
-                        {savingTurns.has(i) ? "Saving…" : savedTurns.has(i) ? "Saved ✓" : "Save"}
-                      </span>
-                    </button>
+                    {/* Set as edit source — shown on all turns when branching is possible */}
+                    {turns.length > 1 && (
+                      <button
+                        style={{
+                          ...S.imgActionBtn(false),
+                          outline: isSource ? "1px solid #f5a623" : "none",
+                        }}
+                        onClick={() => setSourceTurnIdx(i)}
+                        title="Use as source for next edit"
+                      >
+                        <SourceIcon />
+                      </button>
+                    )}
+                    {/* Trash + Save — only for edited turns */}
+                    {i > 0 && (
+                      <>
+                        <button
+                          style={S.imgActionBtn(deletingTurns.has(i) || isSaving || isLoading)}
+                          onClick={() => handleDeleteTurn(i)}
+                          disabled={deletingTurns.has(i) || isSaving || isLoading}
+                          title="Delete this edit"
+                        >
+                          <TrashIcon />
+                        </button>
+                        <button
+                          style={S.imgActionBtn(savingTurns.has(i) || savedTurns.has(i) || isSaving)}
+                          onClick={() => handleSaveTurn(i)}
+                          disabled={savingTurns.has(i) || savedTurns.has(i) || isSaving}
+                          title={savedTurns.has(i) ? "Already saved as a group slice" : "Save as group slice"}
+                        >
+                          <SaveIcon />
+                          <span style={{ fontSize: 11 }}>
+                            {savingTurns.has(i) ? "Saving…" : savedTurns.has(i) ? "Saved ✓" : "Save"}
+                          </span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
