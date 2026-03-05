@@ -1,4 +1,4 @@
 fiftyone
 huggingface_hub
 Pillow
-bson
+pymongo
