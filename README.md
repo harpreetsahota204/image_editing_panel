@@ -35,7 +35,6 @@ The panel ships with a curated list of warm HuggingFace image-to-image models an
 | FiftyOne | Required |
 | HuggingFace Hub | Required |
 | Pillow | Required |
-| bson | Required |
 | HuggingFace API token | A `HF_TOKEN` with inference access — get one at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
 
 ---
@@ -66,6 +65,20 @@ fiftyone app launch
 > The plugin reads `HF_TOKEN` from the environment at startup. If it is missing the panel will display a setup prompt with these same instructions.
 
 ---
+
+## Getting Started
+
+If you want to quickly test the plugin, you can use the FiftyOne quickstart dataset:
+
+```python
+import fiftyone as fo
+import fiftyone.zoo as foz
+
+dataset = foz.load_zoo_dataset("quickstart")
+session = fo.launch_app(dataset)
+```
+
+Alternatively, if you have your own dataset and want to test the plugin with your data, see the [FiftyOne documentation on importing datasets](https://docs.voxel51.com/user_guide/import_datasets.html) to learn how to load your data into FiftyOne.
 
 ## Usage
 
